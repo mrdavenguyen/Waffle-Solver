@@ -59,10 +59,10 @@ for i in range(1, num_puzzles + 1):
             color = 'green'
         elif 'yellow' in classes:
             color = 'yellow'
-        elif 'gray' in classes:
-            color = 'gray'
-        elif 'fixed' in classes:
-            color = 'fixed'
+        # elif 'gray' in classes:
+        #     color = 'gray'
+        # elif 'fixed' in classes:
+        #     color = 'fixed'
         
         tile_data.append({
             'letter': letter,
