@@ -77,7 +77,3 @@ for i in range(1, num_puzzles + 1):
     print(f"Puzzle {i} complete.")
 
     driver.find_element(By.CSS_SELECTOR, "button.button--back.icon-button").click()
-
-
-
-# <button tabindex="-1" class="button--back icon-button" style=""> </button>
