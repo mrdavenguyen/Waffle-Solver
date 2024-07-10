@@ -12,7 +12,10 @@ def main():
     options = ChromeOptions()
     options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
+    
+    actions = ActionChains(driver)
 
+    tile_swap()
     driver.get("https://wafflegame.net/archive")
     driver.implicitly_wait(3)
     #waits until the data is displayed and visible on the screen
@@ -35,7 +38,7 @@ def main():
         #clicks the back button to return to the archive menu
         driver.find_element(By.CSS_SELECTOR, "button.button--back.icon-button").click()
 
-def tile_swap(actions, driver, source_pos, target_pos):
+def tile_swap(actions: ActionChains, driver: webdriver, source_pos: str, target_pos: str) -> None:
     """
     Pre-Condition: Known tiles to be swapped will be provided, order is irrelevant
     Post-Condition: Tiles will be swapped on screen
@@ -47,14 +50,14 @@ def tile_swap(actions, driver, source_pos, target_pos):
     target_tile_pos = driver.find_element(By.CSS_SELECTOR, f"[data-pos='{target_pos}']")
     actions.drag_and_drop(source_tile_pos, target_tile_pos).perform()
 
-def scrape_tiles(driver):
+def scrape_tiles(driver: webdriver) -> list:
     """
     Pre-Condition: Puzzle to be scraped will be loaded on screen
     Post-Condition: Data for all the current letter tiles will be returned
     ---------------
     This function will grab all the elements on screen that correlate with the letter tiles that are present on the current board.
     It will grab some data from each tile: the letter in plain text between the <div></div>, the color from the class name, and
-    the position as notated by an attribute called "data-pos". Then the data for the board is returned. 
+    the position as notated by an attribute called "data-pos". Then the data for the board is returned as a list of dictionaries. 
     """
     tiles = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[class^='tile draggable tile']")))
     count = 0
@@ -88,7 +91,7 @@ def scrape_tiles(driver):
 
     return tile_data
 
-def scroll_to_next_puzzle(driver, puzzle_number):
+def scroll_to_next_puzzle(driver: webdriver, puzzle_number: int) -> None:
     """
     Pre-Condition: The web page will be in the archive menu and a puzzle to be selected is known and provided
     Post-Contition: The puzzle board for the current puzzle will have been loaded to the screen.
