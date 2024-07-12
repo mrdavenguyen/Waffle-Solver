@@ -27,6 +27,7 @@ def find_optimal_swaps():
             find_optimal_swaps()
     return
 
+
 def assign_colors():
     loop_through_all_boxes:
         reset_colors()
@@ -55,5 +56,3 @@ def assign_yellows_and_whites():
 
 if __name__ == "__main__":
     main()
-
-    
