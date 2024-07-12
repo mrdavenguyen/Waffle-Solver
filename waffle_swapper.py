@@ -16,13 +16,17 @@ def find_optimal_swaps():
         if not green:
             swap_pair()
             save_swap()
+            swaps_remaining -= 1
             increment_indexes()
             find_optimal_swaps()
+            swap_pair()
             swaps[-1].pop()
+            swaps_remaining += 1
         else:
             increment_indexes()
             find_optimal_swaps()
-            return
+    return
+
 
 def assign_colors():
     loop_through_all_boxes:
@@ -52,5 +56,3 @@ def assign_yellows_and_whites():
 
 if __name__ == "__main__":
     main()
-
-    
