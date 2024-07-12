@@ -178,7 +178,7 @@ def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[in
         # try and swap with yellow letters from the same line and check if it makes valid word
         try_yellow_letters(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_2)
         # try and swap with yellow letters from a perpendicular line and check if it makes valid word
-        try_yellow_perpendicular(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_2)
+        try_yellow_perpendicular(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
         # try and swap with white letters from other lines and check if it makes valid word
         try_white_letters(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornt_1, line_ornt_2)
     else:
@@ -242,7 +242,7 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
             line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
             line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color'] = None
 
-def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_2: str) -> None:
+def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     if line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2] != None:
         line = line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2]
         yellow_keys = list(line_ornts_2[line]['yellow'].keys())
@@ -254,12 +254,28 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['letter'] = line_ornts_2[line]['yellow'][box]['letter']
                 # assume that the letter is correct and make it green
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = 'green'
+                temp_2 = None
+                pos_2 = None
+                line_2 = None
+                # archive #2 exception:
+                # if a yellow letter in a perpendicular line is on an intersection with another perpendicular line, remove the yellow letter from that line
+                if line_ornts_2[line]['yellow'][box][line_ornt_1] != None:
+                    line_2 = line_ornts_2[line]['yellow'][box][line_ornt_1]
+                    yellow_keys = list(line_ornts_1[line_2]['yellow'].keys())
+                    for box_2 in yellow_keys:
+                        # if the box in the second perpendicular line is the same as the one in the first perpendicular line, remove it from the second perpendicular's yellow list
+                        if line_ornts_1[line_2]['yellow'][box_2] == line_ornts_2[line]['yellow'][box]:
+                            pos_2 = box_2
+                            temp_2 = line_ornts_1[line_2]['yellow'].pop(pos_2)
+                            break
                 # remove the box from the yellow letter list
                 temp = line_ornts_2[line]['yellow'].pop(box)
                 if makes_valid_word(rows, columns, line_index, word_list):
                     next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
                     solve_waffle(boxes, rows, columns, white_letters, word_list, solutions, next_line_index, next_letter_index)
                 line_ornts_2[line]['yellow'][box] = temp
+                if temp_2 != None:
+                    line_ornts_1[line_2]['yellow'][pos_2] = temp_2
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['letter'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter']
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter'] = None
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
@@ -297,7 +313,6 @@ def increment_indexes(line_index: int, letter_index: int) -> Tuple[int, int]:
 
 def makes_valid_word(rows: dict[int, dict], columns: dict[int, dict], line_index: str, word_list: list[str]) -> bool:
     green_letters, yellow_letters, line_white_letters = get_colored_letters(rows, columns, line_index)
-
     for word in word_list:
         current_word = word
         valid = True
@@ -310,7 +325,7 @@ def makes_valid_word(rows: dict[int, dict], columns: dict[int, dict], line_index
                 # check that current word doesn't contain any of this line's initial white letters
                 valid, current_word = compare_with_whites(line_white_letters, current_word, valid)
                 if valid:
-                    # print("line:", line_index, "word:", current_word)
+                    print("line:", line_index, "word:", current_word)
                     return True
     return False
 
