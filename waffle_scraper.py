@@ -15,7 +15,6 @@ def main():
     
     actions = ActionChains(driver)
 
-    tile_swap()
     driver.get("https://wafflegame.net/archive")
     driver.implicitly_wait(3)
     #waits until the data is displayed and visible on the screen
@@ -91,7 +90,7 @@ def scrape_tiles(driver: webdriver) -> list:
 
     return tile_data
 
-def scroll_to_next_puzzle(driver: webdriver, puzzle_number: int) -> None:
+def scroll_to_puzzle(driver: webdriver, puzzle_number: int) -> None:
     """
     Pre-Condition: The web page will be in the archive menu and a puzzle to be selected is known and provided
     Post-Contition: The puzzle board for the current puzzle will have been loaded to the screen.
