@@ -202,6 +202,9 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
             temp_3 = None
             pos_3 = None
             line_3 = None
+            temp_4 = None
+            pos_4 = None
+            removed_yellow = False
             if line_ornts_1[line_index % 3]['yellow'][box][line_ornt_2] != None:
                 line_3 = line_ornts_1[line_index % 3]['yellow'][box][line_ornt_2]
                 yellow_keys = list(line_ornts_2[line_3]['yellow'].keys())
@@ -210,7 +213,18 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
                     if line_ornts_2[line_3]['yellow'][box_2] == line_ornts_1[line_index % 3]['yellow'][box]:
                         pos_3 = box_2
                         temp_3 = line_ornts_2[line_3]['yellow'].pop(pos_3)
+                        removed_yellow = True
                         break
+                if removed_yellow:
+                    # if the perpendicular line contains a white tile that is the same letter as the removed yellow, remove the letter from white list
+                    # (this step should also add the letter to the yellow list, but would require a restructuring of white line lists to hold boxes instead of letters) *
+                    white_keys = list(line_ornts_2[line_3]['white'].keys())
+                    for box_2 in white_keys:
+                        if line_ornts_2[line_3]['white'][box_2] == line_ornts_1[line_index % 3]['yellow'][box]['letter']:
+                            pos_4 = box_2
+                            temp_4 = line_ornts_2[line_3]['white'].pop(pos_4)
+                            break
+                    
             # remove the box from the yellow letter list
             temp = line_ornts_1[line_index % 3]['yellow'].pop(box)
             # waffle puzzle archive #138 exception
@@ -237,6 +251,9 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
                 line_ornts_2[line_2]['yellow'][pos_2] = temp_2
             if temp_3 != None:
                 line_ornts_2[line_3]['yellow'][pos_3] = temp_3
+            # return removed white letter to perpendicular line if removed
+            if temp_4 != None:
+                line_ornts_2[line_3]['white'][pos_4] = temp_4
             line_ornts_1[line_index % 3]['boxes'][letter_index]['letter'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter']
             line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter'] = None
             line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
@@ -283,8 +300,15 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
 
 def try_white_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     for box in range(len(white_letters)):
-        # white letter isn't in the same line as current letter
-        if white_letters[box][line_ornt_1] != line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_1]:
+        valid_white = True
+        for box_2 in line_ornts_1[line_index % 3]['white']:
+            if white_letters[box]['letter'] == line_ornts_1[line_index % 3]['white'][box_2]:
+                valid_white = False
+        if valid_white:
+
+        # # white letter isn't in the same line as current letter # #
+        # if white_letters[box][line_ornt_1] != line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_1]:
+
             # white letter isn't in a perpendicular line
             if not (line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2] != None and white_letters[box][line_ornt_2] == line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2]):
                 # save what the current letter and color are and change current box to the white letter
