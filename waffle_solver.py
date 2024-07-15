@@ -11,10 +11,10 @@ def main():
     # create a data structure to store the lists of yellow and white letters in each row and column
     rows, columns = create_rows_and_columns(boxes)
     # create list of all white letters in puzzle
-    white_letters = create_white_letter_list(boxes, rows, columns)
+    white_letters, og_white_letters = create_white_letter_list(boxes, rows, columns)
     word_list = get_word_list()
     solutions = []
-    solve_waffle(boxes, rows, columns, white_letters, word_list, solutions)
+    solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions)
     if len(solutions) == 0:
         print("No solutions found.")
     else:
@@ -137,6 +137,8 @@ def create_white_letter_list(boxes: dict[int, dict], rows: dict[int, dict], colu
     for i in range(len(boxes)):
         if boxes[i]['color'] == 'white':
             white_letters.append(copy.deepcopy(boxes[i]))
+    # create an original copy of the white letters in order to check that all letters have been used at the end
+    og_white_letters = copy.deepcopy(white_letters)
     # waffle puzzle archive #138 exception: a non-green intersectional letter has matching yellow letters in perpendicular lines (row and column)
     for box in boxes:
         added_letter = False
@@ -153,15 +155,26 @@ def create_white_letter_list(boxes: dict[int, dict], rows: dict[int, dict], colu
                                 break
                     if added_letter:
                         break
-    return white_letters
+    return white_letters, og_white_letters
 
-def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int = 0, letter_index: int = 0) -> list[list]:
+def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], og_white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int = 0, letter_index: int = 0) -> list[list]:
+    # when all tiles have been filled with green letters, evaluate the solution
     if line_index == 6:
-        solutions.append([])
-        for i in range(len(boxes)):
-            solutions[-1].append(boxes[i]['letter'])
-        return solutions
-
+        # check if there are remaining yellow letters in any lines. if so the solution isn't valid, and the solution shouldn't be added
+        for i in range(len(rows)):
+            if rows[i]['yellow'] or columns[i]['yellow']:
+                print(rows[i]['yellow'])
+                # return without adding solution
+                return solutions
+        # if all of the letters in the white letter list have been removed, save the solution
+        if not og_white_letters:
+            solutions.append([])
+            for i in range(len(boxes)):
+                solutions[-1].append(boxes[i]['letter'])
+            return solutions
+        else:
+            return solutions
+            
     if line_index < 3:
         line_ornts_1 = rows
         line_ornts_2 = columns
@@ -175,18 +188,20 @@ def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[in
 
     # if current letter isn't already green
     if line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] != 'green':
-        # try and swap with yellow letters from the same line and check if it makes valid word
-        try_yellow_letters(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_2)
-        # try and swap with yellow letters from a perpendicular line and check if it makes valid word
-        try_yellow_perpendicular(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
-        # try and swap with white letters from other lines and check if it makes valid word
-        try_white_letters(boxes, rows, columns, white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornt_1, line_ornt_2)
+        # try and swap with yellow letters from the same line and check if it makes a valid word
+        try_yellow_letters(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
+        # try and swap with yellow letters from a perpendicular line and check if it makes a valid word
+        try_yellow_perpendicular(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
+        # try and swap with white letters from other lines and check if it makes a valid word
+        try_white_letters(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornt_1, line_ornt_2)
     else:
+        # increase index to move to the next letter or line
         next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
-        solve_waffle(boxes, rows, columns, white_letters, word_list, solutions, next_line_index, next_letter_index)
+        # call the function again with the new index
+        solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
     return solutions
 
-def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_2: str) -> None:
+def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], og_white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     yellow_keys = list(line_ornts_1[line_index % 3]['yellow'].keys()) # Has to be a list of indexes otherwise it freaks out when it pops something from dictionary
     for box in yellow_keys:
         # if the letter from the yellow pool isn't the same as the current letter, or (is the same but comes before the current letter and current letter is white)
@@ -205,14 +220,18 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
             temp_4 = None
             pos_4 = None
             removed_yellow = False
+            # if the yellow box is a member of a perpendicular line (on an intersection)
             if line_ornts_1[line_index % 3]['yellow'][box][line_ornt_2] != None:
+                # iterate through the perpendicular line's yellow letters
                 line_3 = line_ornts_1[line_index % 3]['yellow'][box][line_ornt_2]
-                yellow_keys = list(line_ornts_2[line_3]['yellow'].keys())
-                for box_2 in yellow_keys:
-                    # if the box that's in the perpendicular line is the same as the yellow box in this line, remove it
+                yellow_keys2 = list(line_ornts_2[line_3]['yellow'].keys())
+                for box_2 in yellow_keys2:
+                    # if the tile in the perpendicular line is the same as the first yellow tile, remove it
                     if line_ornts_2[line_3]['yellow'][box_2] == line_ornts_1[line_index % 3]['yellow'][box]:
+                        # remove the tile and save the position in case backtracking is needed
                         pos_3 = box_2
                         temp_3 = line_ornts_2[line_3]['yellow'].pop(pos_3)
+                        # flag that a yellow tile has been removed
                         removed_yellow = True
                         break
                 if removed_yellow:
@@ -221,29 +240,42 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
                     white_keys = list(line_ornts_2[line_3]['white'].keys())
                     for box_2 in white_keys:
                         if line_ornts_2[line_3]['white'][box_2] == line_ornts_1[line_index % 3]['yellow'][box]['letter']:
+                            # remove the tile and save the position in case backtracking is needed
                             pos_4 = box_2
                             temp_4 = line_ornts_2[line_3]['white'].pop(pos_4)
-                            break
-                    
-            # remove the box from the yellow letter list
+                            break  
+            # remove the box from the yellow letter list and save for backtracking
             temp = line_ornts_1[line_index % 3]['yellow'].pop(box)
             # waffle puzzle archive #138 exception
             # if current letter is intersectional, and the perpendicular line's yellow letter list contains this letter, remove the letter from that list as well
             temp_2 = None
             pos_2 = None
             line_2 = None
+            # initialise variables for handling backtracking if a third yellow letter is to be removed
+            temp_5 = None
+            pos_5 = None
+            line_5 = None
             if line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2] != None:
                 line_2 = line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2]
-                yellow_keys = list(line_ornts_2[line_2]['yellow'].keys())
-                for box_2 in yellow_keys:
+                yellow_keys2 = list(line_ornts_2[line_2]['yellow'].keys())
+                for box_2 in yellow_keys2:
                     if line_ornts_2[line_2]['yellow'][box_2]['letter'] == line_ornts_1[line_index % 3]['boxes'][letter_index]['letter']:
                         pos_2 = box_2
+                        # if the additional yellow letter to be removed is on an intersection, remove the yellow letter from another perpendicular line as well
+                        if line_ornts_2[line_2]['yellow'][box_2][line_ornt_1] != None:
+                            line_5 = line_ornts_2[line_2]['yellow'][box_2][line_ornt_1]
+                            yellow_keys3 = list(line_ornts_1[line_5]['yellow'].keys())
+                            for box_3 in yellow_keys3:
+                                if line_ornts_1[line_5]['yellow'][box_3] == line_ornts_2[line_2]['yellow'][box_2]:
+                                    pos_5 = box_3
+                                    temp_5 = line_ornts_1[line_5]['yellow'].pop(pos_5)
                         temp_2 = line_ornts_2[line_2]['yellow'].pop(pos_2)
                         break
+                
             # check if valid word can be made with this letter
             if makes_valid_word(rows, columns, line_index, word_list):
                 next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
-                solve_waffle(boxes, rows, columns, white_letters, word_list, solutions, next_line_index, next_letter_index)
+                solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
             # return box to yellow letter list
             line_ornts_1[line_index % 3]['yellow'][box] = temp
             # return other box to perpendicular yellow list if it was removed
@@ -254,12 +286,15 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
             # return removed white letter to perpendicular line if removed
             if temp_4 != None:
                 line_ornts_2[line_3]['white'][pos_4] = temp_4
+            # return extra intersectional box to 2nd perpendicular line's yellow list if removed
+            if temp_5 != None:
+                line_ornts_1[line_5]['yellow'][pos_5] = temp_5
             line_ornts_1[line_index % 3]['boxes'][letter_index]['letter'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter']
             line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter'] = None
             line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
             line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color'] = None
 
-def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
+def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], og_white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     if line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2] != None:
         line = line_ornts_1[line_index % 3]['boxes'][letter_index][line_ornt_2]
         yellow_keys = list(line_ornts_2[line]['yellow'].keys())
@@ -278,8 +313,8 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
                 # if a yellow letter in a perpendicular line is on an intersection with another perpendicular line, remove the yellow letter from that line
                 if line_ornts_2[line]['yellow'][box][line_ornt_1] != None:
                     line_2 = line_ornts_2[line]['yellow'][box][line_ornt_1]
-                    yellow_keys = list(line_ornts_1[line_2]['yellow'].keys())
-                    for box_2 in yellow_keys:
+                    yellow_keys2 = list(line_ornts_1[line_2]['yellow'].keys())
+                    for box_2 in yellow_keys2:
                         # if the box in the second perpendicular line is the same as the one in the first perpendicular line, remove it from the second perpendicular's yellow list
                         if line_ornts_1[line_2]['yellow'][box_2] == line_ornts_2[line]['yellow'][box]:
                             pos_2 = box_2
@@ -289,7 +324,7 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
                 temp = line_ornts_2[line]['yellow'].pop(box)
                 if makes_valid_word(rows, columns, line_index, word_list):
                     next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
-                    solve_waffle(boxes, rows, columns, white_letters, word_list, solutions, next_line_index, next_letter_index)
+                    solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
                 line_ornts_2[line]['yellow'][box] = temp
                 if temp_2 != None:
                     line_ornts_1[line_2]['yellow'][pos_2] = temp_2
@@ -298,7 +333,7 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color'] = None
 
-def try_white_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
+def try_white_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], og_white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     for box in range(len(white_letters)):
         valid_white = True
         for box_2 in line_ornts_1[line_index % 3]['white']:
@@ -319,10 +354,17 @@ def try_white_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: di
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = 'green'
                 # remove the box from the white letter list
                 temp = white_letters.pop(box)
+                # remove the box from the original white letter list if the index is within range
+                temp_2 = None
+                if box < len(og_white_letters):
+                    temp_2 = og_white_letters.pop(box)
                 if makes_valid_word(rows, columns, line_index, word_list):
                     next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
-                    solve_waffle(boxes, rows, columns, white_letters, word_list, solutions, next_line_index, next_letter_index)
+                    solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
                 white_letters.insert(box, temp)
+                # return the box to the original white letter list
+                if temp_2 != None:
+                    og_white_letters.insert(box, temp_2)
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['letter'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter']
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_letter'] = None
                 line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] = line_ornts_1[line_index % 3]['boxes'][letter_index]['prev_color']
@@ -550,7 +592,7 @@ def get_word_list() -> list[str]:
     'haunt',     'haute',     'haven',     'havoc',     'hazel',     'heady',     'heard',     'heart',
     'heath',     'heave',     'heavy',     'hedge',     'hefty',     'heist',     'helix',     'hello',
     'hence',     'heron',     'hilly',     'hinge',     'hippo',     'hippy',     'hitch',     'hoard',
-    'hobby',     'hoist',     'holly',     'homer',     'honey',     'honor',     'horde',     'horny',
+    'hobby',     'hoist',     'holly',     'homer',     'honey',     'honor',     'hoped',     'horde',     'horny',
     'horse',     'hotel',     'hotly',     'hound',     'house',     'hovel',     'hover',     'howdy',
     'human',     'humid',     'humor',     'humph',     'humus',     'hunch',     'hunky',     'hurry',
     'husky',     'hussy',     'hutch',     'hydro',     'hyena',     'hymen',     'hyper',     'icily',
@@ -715,7 +757,7 @@ def get_word_list() -> list[str]:
     'woozy',     'wordy',     'world',     'worry',     'worse',     'worst',     'worth',     'would',
     'wound',     'woven',     'wrack',     'wrath',     'wreak',     'wreck',     'wrest',     'wring',
     'wrist',     'write',     'wrong',     'wrote',     'wrung',     'wryly',     'yacht',     'yearn',
-    'yeast',     'yield',     'young',     'youth',     'yucca',     'zebra',     'zesty',     'zonal']
+    'yeast',     'yield',     'yodel',     'young',     'youth',     'yucca',     'zebra',     'zesty',     'zonal']
     return word_list
 
 if __name__ == "__main__":
