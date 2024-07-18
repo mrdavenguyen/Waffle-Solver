@@ -10,11 +10,11 @@ import time
 def main():
     #options for headless mode
     options = ChromeOptions()
-    options.add_argument("--headless=new")
+    # options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
     
     actions = ActionChains(driver)
-
+    
     driver.get("https://wafflegame.net/archive")
     driver.implicitly_wait(3)
     #waits until the data is displayed and visible on the screen
@@ -29,25 +29,19 @@ def main():
             break
 
     for i in range(1, num_puzzles + 1):
-        scroll_to_next_puzzle(driver, i)
+        scroll_to_puzzle(driver, i)
         tile_data_list = scrape_tiles(driver)
         for tile_data in tile_data_list:
-            print(tile_data)
-        print(f"Puzzle {i} complete.")
+            print_debug(f"{tile_data},")
+        print_debug(f"Puzzle {i} complete.")
         #clicks the back button to return to the archive menu
         driver.find_element(By.CSS_SELECTOR, "button.button--back.icon-button").click()
 
-def tile_swap(actions: ActionChains, driver: webdriver, source_pos: str, target_pos: str) -> None:
-    """
-    Pre-Condition: Known tiles to be swapped will be provided, order is irrelevant
-    Post-Condition: Tiles will be swapped on screen
-    ---------------
-    This function is provided the "data-pos" value of two tiles (as well as the WebDriver and ActionChain objects)
-    and simply swaps their locations on screen. 
-    """
-    source_tile_pos = driver.find_element(By.CSS_SELECTOR, f"[data-pos='{source_pos}']")
-    target_tile_pos = driver.find_element(By.CSS_SELECTOR, f"[data-pos='{target_pos}']")
-    actions.drag_and_drop(source_tile_pos, target_tile_pos).perform()
+def print_debug(text):
+    print(f"{text}")
+    with open("puzzle_data.txt", "a") as myfile:
+        myfile.write(f"{text}\n")
+    myfile.close()
 
 def scrape_tiles(driver: webdriver) -> list:
     """
@@ -64,11 +58,6 @@ def scrape_tiles(driver: webdriver) -> list:
 
     for tile in tiles:
         letter = tile.text
-
-        #DEBUG
-        if letter == "":
-            quit()
-
         position = tile.get_attribute('data-pos')
         classes = tile.get_attribute('class').split()
         color = None
