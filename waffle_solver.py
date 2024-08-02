@@ -165,15 +165,25 @@ def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[in
             if rows[i]['yellow'] or columns[i]['yellow']:
                 print(rows[i]['yellow'])
                 # return without adding solution
-                return solutions
+                return
         # if all of the letters in the white letter list have been removed, save the solution
         if not og_white_letters:
             solutions.append([])
-            for i in range(len(boxes)):
-                solutions[-1].append(boxes[i]['letter'])
-            return solutions
+            for row in rows:
+                solutions[-1].append([])
+                word = ""
+                for box in rows[row]['boxes']:
+                    word += rows[row]['boxes'][box]['letter']
+                solutions[-1][row] = word
+            for column in columns:
+                solutions[-1].append([])
+                word = ""
+                for box in columns[column]['boxes']:
+                    word += columns[column]['boxes'][box]['letter']
+                solutions[-1][column + 3] = word                
+            return
         else:
-            return solutions
+            return
             
     if line_index < 3:
         line_ornts_1 = rows
@@ -190,16 +200,22 @@ def solve_waffle(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[in
     if line_ornts_1[line_index % 3]['boxes'][letter_index]['color'] != 'green':
         # try and swap with yellow letters from the same line and check if it makes a valid word
         try_yellow_letters(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
+        if solutions:
+            return
         # try and swap with yellow letters from a perpendicular line and check if it makes a valid word
         try_yellow_perpendicular(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornts_2, line_ornt_1, line_ornt_2)
+        if solutions:
+            return
         # try and swap with white letters from other lines and check if it makes a valid word
         try_white_letters(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, line_index, letter_index, line_ornts_1, line_ornt_1, line_ornt_2)
+        if solutions:
+            return
     else:
         # increase index to move to the next letter or line
         next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
         # call the function again with the new index
         solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
-    return solutions
+    return
 
 def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: dict[int, dict], white_letters: list[dict], og_white_letters: list[dict], word_list: list[str], solutions: list[list], line_index: int, letter_index: int, line_ornts_1: dict[int, dict], line_ornts_2: dict[int, dict], line_ornt_1: str, line_ornt_2: str) -> None:
     yellow_keys = list(line_ornts_1[line_index % 3]['yellow'].keys()) # Has to be a list of indexes otherwise it freaks out when it pops something from dictionary
@@ -276,6 +292,8 @@ def try_yellow_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: d
             if makes_valid_word(rows, columns, line_index, word_list):
                 next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
                 solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
+                if solutions:
+                    return
             # return box to yellow letter list
             line_ornts_1[line_index % 3]['yellow'][box] = temp
             # return other box to perpendicular yellow list if it was removed
@@ -325,6 +343,8 @@ def try_yellow_perpendicular(boxes: dict[int, dict], rows: dict[int, dict], colu
                 if makes_valid_word(rows, columns, line_index, word_list):
                     next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
                     solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
+                    if solutions:
+                        return
                 line_ornts_2[line]['yellow'][box] = temp
                 if temp_2 != None:
                     line_ornts_1[line_2]['yellow'][pos_2] = temp_2
@@ -361,6 +381,8 @@ def try_white_letters(boxes: dict[int, dict], rows: dict[int, dict], columns: di
                 if makes_valid_word(rows, columns, line_index, word_list):
                     next_line_index, next_letter_index = increment_indexes(line_index, letter_index)
                     solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions, next_line_index, next_letter_index)
+                    if solutions:
+                        return
                 white_letters.insert(box, temp)
                 # return the box to the original white letter list
                 if temp_2 != None:

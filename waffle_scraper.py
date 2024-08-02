@@ -7,6 +7,8 @@ from selenium.webdriver.common.action_chains import ActionChains
 import copy
 from typing import Tuple
 from waffle_solver import solve_waffle
+from waffle_swapper import find_optimal_swaps
+import time
 
 NUM_BOXES = 21
 
@@ -14,7 +16,7 @@ def main():
     results = []
     #options for headless mode
     options = ChromeOptions()
-    options.add_argument("--headless=new")
+    # options.add_argument("--headless=new")
     driver = webdriver.Chrome(options=options)
     
     actions = ActionChains(driver)
@@ -35,30 +37,78 @@ def main():
     word_list = get_word_list()
     for i in range(1, num_puzzles + 1):
         scroll_to_puzzle(driver, i)
-        boxes, swap_boxes = create_box_dicts()
-        scrape_tiles(driver, boxes, swap_boxes)
-        rows, columns = create_rows_and_columns(boxes)
-        white_letters, og_white_letters = create_white_letter_list(boxes, rows, columns)
-        solutions = []
-        solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions)
-        if len(solutions) == 0:
-            print("No solutions found.")
-            results.append(f"Puzzle {i}")
-            with open("nosolutiontest.txt", "a") as file:
-                file.write(f"{results[-1]}\n")
-        else:
-            no_dupes = []
-            for item in solutions:
-                if item not in no_dupes:
-                    no_dupes.append(item)
-            if len(no_dupes) > 1:
-                print("Multiple solutions found")
-
-            for item in no_dupes:
-                print(item)
+        additional_swaps = -1
+        # continues in a loop of scraping, solving, and finding optimal swaps while the outcome of swaps aren't what was expected
+        while True:
+            boxes, swap_boxes, lines = create_box_dicts()
+            scrape_tiles(driver, boxes, swap_boxes)
+            rows, columns = create_rows_and_columns(boxes)
+            white_letters, og_white_letters = create_white_letter_list(boxes, rows, columns)
+            remaining_swaps = get_remaining_swaps(driver) + additional_swaps
+            print(remaining_swaps)
+            time.sleep(5)
+            solutions = []
+            solve_waffle(boxes, rows, columns, white_letters, og_white_letters, word_list, solutions)
+            # if len(solutions) == 0:
+            #     print("No solutions found.")
+            #     # results.append(f"Puzzle {i}")
+            #     # with open("nosolutiontest.txt", "a") as file:
+            #     #     file.write(f"{results[-1]}\n")
+            # else:
+            #     no_dupes = []
+            #     for item in solutions:
+            #         if item not in no_dupes:
+            #             no_dupes.append(item)
+            #     if len(no_dupes) > 1:
+            #         print("Multiple solutions found")
+            #     for item in no_dupes:
+            #         print(item)
+            solutions = solutions[0]
+            print(solutions)
+            optimal_swaps = find_optimal_swaps(swap_boxes, solutions, lines, swaps_remaining = remaining_swaps)
+            expected_colors = make_swaps(actions, driver, optimal_swaps)
+            if expected_colors:
+                break
+            else:
+                if additional_swaps == 5:
+                    break
+                else:
+                    additional_swaps += 1
+        remaining_swaps = get_remaining_swaps(driver)
+        # results.append(f"Puzzle {i}: Remaining swaps = {remaining_swaps}")
+        # with open("swapsremaining.txt", "a") as file:
+        #     file.write(f"{results[-1]}\n")
         print(f"Puzzle {i} of {num_puzzles} complete.")
         #clicks the back button to return to the archive menu
+        time.sleep(1)
         driver.find_element(By.CSS_SELECTOR, "button.button--back.icon-button").click()
+
+def make_swaps(actions, driver, swaps):
+    if not swaps:
+        return False
+    for swap in swaps:
+        tile_swap(actions, driver, swap['positions'][0], swap['positions'][1])
+        swapped_colors = get_swapped_tile_colors(driver, swap)
+        if swapped_colors[0] != swap['expected_colors'][0] or swapped_colors[1] != swap['expected_colors'][1]:
+            return False
+    return True
+
+def get_swapped_tile_colors(driver, swap):
+    tiles = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[class^='tile draggable tile']")))
+    swapped_colors = []
+    for pos in swap['positions']:
+        for j in range(NUM_BOXES):
+            position = tiles[j].get_attribute('data-pos')
+            if position == pos:
+                classes = tiles[j].get_attribute('class').split()
+                color = 'grey'
+                if 'green' in classes:
+                    color = 'green'
+                elif 'yellow' in classes:
+                    color = 'yellow'
+                swapped_colors.append(color)
+                break
+    return swapped_colors
 
 def create_box_dicts() -> Tuple[dict[int, dict], dict[int, dict]]:
     # create a data structure to store all letter "boxes":
@@ -73,16 +123,46 @@ def create_box_dicts() -> Tuple[dict[int, dict], dict[int, dict]]:
             'column': None
         }
 
-    swap_boxes = {}
-    for i in range(NUM_BOXES):
-        swap_boxes[i] = {
+    swap_boxes = []
+    for i in range(25):
+        swap_boxes.append({
             'letter': None,
             'color': None,
             'row': None,
             'column': None,
             'position': None            
-        }
-    return boxes, swap_boxes
+        })
+        for j in range(3):
+            if (j * 10) + 0 <= i <= (j * 10) + 4:
+                swap_boxes[i]['row'] = j
+
+            if (i - (2 * j)) % 5 == 0:
+                swap_boxes[i]['column'] = j
+
+    for i in range(5):
+        for j in range(5):
+            swap_boxes[(i * 5) + j]['position'] = f'{{"x":{j},"y":{i}}}'
+
+    # collect indexes to remove
+    indexes_to_remove = [i for i in range(25) if swap_boxes[i]['row'] == None and swap_boxes[i]['column'] == None]
+
+    # remove indexes in reverse order to prevent index errors
+    for index in indexes_to_remove[::-1]:
+        swap_boxes.pop(index)
+
+    lines = {}
+    for i in range(6):
+        lines[i] = {}
+    for i in range(3):
+        for j in range(len(swap_boxes)):
+            if swap_boxes[j]['row'] == i:
+                lines[i][len(lines[i])] = swap_boxes[j]
+    for i in range(3):
+        for j in range(len(swap_boxes)):
+            if swap_boxes[j]['column'] == i:
+                lines[i + 3][len(lines[i + 3])] = swap_boxes[j]
+
+    return boxes, swap_boxes, lines
 
 def create_rows_and_columns(boxes: dict[int, dict]) -> Tuple[dict[int, dict], dict[int, dict]]:
     rows = {}
@@ -200,7 +280,15 @@ def scrape_tiles(driver: webdriver, boxes: dict[int, dict], swap_boxes: dict[int
     It will grab some data from each tile: the letter in plain text between the <div></div>, the color from the class name, and
     the position as notated by an attribute called "data-pos". Then the data for the board is returned as a list of dictionaries. 
     """
-    tiles = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[class^='tile draggable tile']")))
+    unsorted_tiles = WebDriverWait(driver, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "[class^='tile draggable tile']")))
+    # sort tiles so that they are always in position order, rather than being in the starting order of their letters
+    tiles = []
+    for i in range(len(swap_boxes)):
+        for j in range(len(unsorted_tiles)):
+            pos = unsorted_tiles[j].get_attribute('data-pos')
+            if swap_boxes[i]['position'] == pos:
+                tiles.append(unsorted_tiles[j])
+                break
 
     for i in range(NUM_BOXES):
         letter = tiles[i].text.lower()
@@ -224,6 +312,11 @@ def scrape_tiles(driver: webdriver, boxes: dict[int, dict], swap_boxes: dict[int
         swap_boxes[i]['letter'] = letter
         swap_boxes[i]['color'] = color
         swap_boxes[i]['position'] = position
+
+def get_remaining_swaps(driver: webdriver) -> int:
+    element = WebDriverWait(driver, 10).until(EC.presence_of_element_located(
+        (By.XPATH, "//main[@class='archive-main game game--active']//div[@class='swaps']//span[@class='swaps__val']")))
+    return int(driver.execute_script("return arguments[0].textContent;", element))
 
 def scroll_to_puzzle(driver: webdriver, puzzle_number: int) -> None:
     """
